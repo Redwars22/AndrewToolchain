@@ -45,8 +45,8 @@ type MathExpression = {
 type MathFunction = {
     operation: string;
     destination: string;
-    arg1: number;
-    arg2?: number | undefined;
+    arg1: number | string;
+    arg2?: number | string | undefined;
     result: number | string | undefined;
 }
 
@@ -569,8 +569,6 @@ function assignToVariable(command) {
     value = command[1];
     const typeOfData = checkType(value);
 
-    console.log(typeOfData)
-
     if (variables[variable] || variables[variable] == 0) {
         switch (typeOfData) {
             case types.BOOL:
@@ -908,8 +906,6 @@ function parseMathExpression(expr) {
         expression.right = tokensArray[1].replaceAll(' ', '')
     else expression.right = tokensArray[1];
 
-    console.log(expression);
-
     if (isNaN(expression.left))
         if (variables[expression.left]) {
             expression.left = variables[expression.left];
@@ -958,10 +954,35 @@ function handleMathFunction(mathFunction: string) {
     const math = {
         operation: tokens[1],
         destination: tokens[2],
-        arg1: Number(tokens[3]),
-        arg2: tokens[4] ? Number(tokens[4]) : undefined,
+        arg1: tokens[3],
+        arg2: tokens[4] ? tokens[4] : undefined,
         result: undefined
     } as MathFunction;
+
+    if (math.arg1 !== undefined)
+        if (isNaN(math.arg1)) {
+            if (String(math.arg1).match(arrayRetrieveElement)) {
+                const value = handleRetrieveElementFromArray(String(math.arg1));
+                math.arg1 = value;
+            } else {
+                const data = searchInVariablesAndConstants(String(math.arg1));
+                math.arg1 = data;
+            }
+        }
+
+    if (math.arg2 !== undefined)
+        if (isNaN(math.arg2)) {
+            if (String(math.arg2).match(arrayRetrieveElement)) {
+                const value = handleRetrieveElementFromArray(math.arg2);
+                math.arg2 = value;
+            } else {
+                const data = searchInVariablesAndConstants(math.arg2);
+                math.arg2 = data;
+            }
+        }
+
+    math.arg1 = Number(math.arg1);
+    if(math.arg2 !== undefined) math.arg2 = Number(math.arg2);
 
     switch (math.operation) {
         case MathFunctions.ABS:

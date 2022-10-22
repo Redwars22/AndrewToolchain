@@ -1,3 +1,4 @@
 *.t
 node_modules
 titanium.js
+examples
