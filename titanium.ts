@@ -75,7 +75,9 @@ const keywords = {
     EXIT: "EXIT",
     RETURN: "RET",
     REPEAT: "REP",
-    SLEEP: "SLEEP"
+    SLEEP: "SLEEP",
+    PROCEDURE: "PROC",
+    CALL_PROCED: "CALL",
 }
 
 const operators = {
@@ -99,10 +101,12 @@ const operators = {
 const variables = {};
 const constants = {};
 const arrays = {};
+const procedures = {};
 
-const arrayDeclaration = /ARR .*[A-Za-z_] = \[.*[0-9A-Za-z_"!@]\]/gm;
+const arrayDeclaration = /ARR .*[A-Za-z_] = \[.*[0-9A-Za-z_"!@]?\]/gm;
 const arrayRetrieveElement = /.*[A-Za-z_]\[.*[0-9A-Za-z_]\]/gm;
 const blockStatement = /.*[A-Za-z_]:/g;
+const callProcedureStatement = /CALL .*[A-Za-z_]/gm;
 const clearConsoleCommand = /clear\(\)/g;
 const constantDeclaration = /DEF .*[A-Za-z_] = "?.*[A-Za-z0-9\(\)]?"?/;
 const decrementStatement = /DEC .*[A-Za-z_]/;
@@ -111,6 +115,7 @@ const incrementStatement = /INC .*[A-Za-z_]/;
 const mathCommand = /MATH .*[A-Za-z0-9\[\]_ ]/;
 const printCommand = /print\("?.*[\[\]0-9A-Z a-z!,_ ?:><=!]?"?\)/g;
 const printLineCommand = /printLine()/gm;
+const procedureDeclaration = /PROC .*[A-Za-z_] =>/gm;
 const repeatCommand = /REP .*[0-9]( )?,( )?.*/g;
 const returnStatement = /(RET) (.*[0-9A-Za-z])?/gm;
 const scanfCommand = /get\(.*[A-Za-z_\[\]]\)/gi;
@@ -297,6 +302,44 @@ function parseCode(code) {
                 //and still hasn't found the other $$ operator
             }
 
+            if (linesOfCodeArray[currentLine].match(/ENDPROC/)) {
+                currentLine++;
+                continue;
+              }
+        
+              if (linesOfCodeArray[currentLine]?.match(callProcedureStatement)) {
+                const identifier = linesOfCodeArray[currentLine].split(" ")[1];
+                let i = 0;
+        
+                while (i < procedures[identifier].length) {
+                  parseLine(procedures[identifier][i]);
+                  i++;
+                }
+        
+                currentLine++;
+                continue;
+              }
+        
+              if (linesOfCodeArray[currentLine].match(procedureDeclaration)) {
+                let statement = linesOfCodeArray[currentLine];
+                skipLine();
+        
+                const proc = {
+                  identifier: statement.split(" ")[1],
+                  commands: [],
+                };
+        
+                while (!linesOfCodeArray[currentLine].match(/ENDPROC/)) {
+                  proc.commands.push(linesOfCodeArray[currentLine].trim());
+                  skipLine();
+                }
+        
+                currentLine++;
+        
+                procedures[proc.identifier] = proc.commands;
+                continue;
+              }
+
             if (linesOfCodeArray[currentLine].includes(keywords.EXIT))
                 throw "the program has exited";
 
@@ -438,6 +481,11 @@ function printToConsole(data, isArray?: boolean) {
     }
 
     if (isNaN(data)) {
+        if(data.match(arrayRetrieveElement)){
+            console.log('aaa')
+            return;
+        }
+
         if (data.match(string))
             console.log(`${data.replaceAll(
                 '"',
@@ -1218,7 +1266,7 @@ function checkIfIsNumber(value): boolean {
 function mainLoop() {
     const titanium_command = defaultUserInput("👻: ");
 
-    if (titanium_command.match(/titanium .*[A-Za-z_]\.t/)) {
+    if (titanium_command.match(/titanium .*[A-Za-z_0-9]\.t/)) {
         const filename = titanium_command.replace("titanium ", "");
         var file = require('fs');
 
