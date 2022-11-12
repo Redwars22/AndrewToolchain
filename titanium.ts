@@ -146,7 +146,7 @@ function checkIfIsString(value): boolean {
 }
 
 
-function checkType(value): string {
+function checkType(value): string | undefined {
     if (checkIfIsString(value)) return types.STRING;
     if (checkIfIsBoolean(value)) return types.BOOL;
     if (checkIfIsNumber(value)) return types.NUMBER;
@@ -155,6 +155,8 @@ function checkType(value): string {
     if (checkIfIsMathExpr(value)) return "mathExpr";
     if (checkIfIsLogicExpr(value)) return "logicExpr";
     if (checkIfIsArrayRetrieveElementStatement(value)) return "arrRetrieveEl";
+
+    return undefined;
 }
 
 const defaultUserInput = require('prompt-sync')();
@@ -248,7 +250,7 @@ function parseLine(command) {
             throw "the program has exited";
 
         if (command.match(returnStatement)) {
-            let returnStatementLine = linesOfCodeArray[currentLine];
+            let returnStatementLine: string = linesOfCodeArray[currentLine];
             const valueOfReturnCode = returnStatementLine.replace(
                 keywords.RETURN + " ",
                 ""
@@ -524,7 +526,7 @@ function concatenate(statement: string) {
             tokens[token] = tokens[token].replace("\"", "");
         }
 
-        if (isNaN(tokens[token]) && !(tokens[token].includes("\""))) {
+        if (isNaN(Number(tokens[token])) && !(tokens[token].includes("\""))) {
             if (tokens[token].match(arrayRetrieveElement)) {
                 const data = handleRetrieveElementFromArray(tokens[token]);
                 tokens[token] = data;
@@ -887,7 +889,7 @@ const Ternary = {
     returnValueIfFalse: null,
 } as TernaryStatement;
 
-const ConditionTokens = {
+const ConditionTokens: {left: string | null, right: string | null}  =  {
     left: null,
     right: null,
 }
@@ -905,22 +907,22 @@ function parseCondition(condition: string) {
     ConditionTokens.left = tokens[0];
     ConditionTokens.right = tokens[2];
 
-    if (isNaN(ConditionTokens.left)) {
+    if (isNaN(Number(ConditionTokens.left))) {
         if (variables[ConditionTokens.left] !== undefined)
             Ternary.condition =
-                Ternary.condition.replace(
+                Ternary.condition!.replace(
                     ConditionTokens.left,
                     Number(variables[ConditionTokens.left])
                 )
         else if (constants[ConditionTokens.left] !== undefined)
             Ternary.condition =
-                Ternary.condition.replace(
+                Ternary.condition!.replace(
                     ConditionTokens.left,
                     Number(constants[ConditionTokens.left])
                 )
         else if (handleRetrieveElementFromArray(ConditionTokens.left) !== undefined) {
             const value = handleRetrieveElementFromArray(ConditionTokens.left);
-            Ternary.condition = Ternary.condition.replace(
+            Ternary.condition = Ternary.condition!.replace(
                 ConditionTokens.left,
                 value
             )
