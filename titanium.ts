@@ -78,6 +78,10 @@ const keywords = {
     SLEEP: "SLEEP",
     PROCEDURE: "PROC",
     CALL_PROCED: "CALL",
+    IF: "IF",
+    END_IF: "ENDIF",
+    FOR: "FOR",
+    END_FOR: "ENDFOR",
 }
 
 const operators = {
@@ -95,7 +99,8 @@ const operators = {
     ARRAY_START: '[',
     ARRAY_END: ']',
     ARRAY_ELEMENT_SEPARATOR: ',',
-    MULTILINE_COMMENT: '$$'
+    MULTILINE_COMMENT: '$$',
+    STATEMENT_BLOCK_BEGIN: "=>",
 }
 
 const variables = {};
@@ -111,6 +116,8 @@ const clearConsoleCommand = /clear\(\)/g;
 const constantDeclaration = /DEF .*[A-Za-z_] = "?.*[A-Za-z0-9\(\)]?"?/;
 const decrementStatement = /DEC .*[A-Za-z_]/;
 const deleteStatement = /DEL .*[A-Za-z_]/;
+const forStatement = /FOR .* =>/;
+const ifStatement = /IF .* =>/;
 const incrementStatement = /INC .*[A-Za-z_]/;
 const mathCommand = /MATH .*[A-Za-z0-9\[\]_ ]/;
 const printCommand = /print\("?.*[\[\]0-9A-Z a-z!,_ ?:><=!]?"?\)/g;
@@ -305,40 +312,128 @@ function parseCode(code) {
             if (linesOfCodeArray[currentLine].match(/ENDPROC/)) {
                 currentLine++;
                 continue;
-              }
-        
-              if (linesOfCodeArray[currentLine]?.match(callProcedureStatement)) {
+            }
+
+            if (linesOfCodeArray[currentLine]?.match(callProcedureStatement)) {
                 const identifier = linesOfCodeArray[currentLine].split(" ")[1];
                 let i = 0;
-        
+
                 while (i < procedures[identifier].length) {
-                  parseLine(procedures[identifier][i]);
-                  i++;
+                    parseLine(procedures[identifier][i]);
+                    i++;
                 }
-        
+
                 currentLine++;
                 continue;
-              }
-        
-              if (linesOfCodeArray[currentLine].match(procedureDeclaration)) {
+            }
+
+            if (linesOfCodeArray[currentLine].match(procedureDeclaration)) {
                 let statement = linesOfCodeArray[currentLine];
                 skipLine();
-        
+
                 const proc = {
-                  identifier: statement.split(" ")[1],
-                  commands: [],
+                    identifier: statement.split(" ")[1],
+                    commands: [],
                 };
-        
+
                 while (!linesOfCodeArray[currentLine].match(/ENDPROC/)) {
-                  proc.commands.push(linesOfCodeArray[currentLine].trim());
-                  skipLine();
+                    proc.commands.push(linesOfCodeArray[currentLine].trim());
+                    skipLine();
                 }
-        
+
                 currentLine++;
-        
+
                 procedures[proc.identifier] = proc.commands;
                 continue;
-              }
+            }
+
+            if (linesOfCodeArray[currentLine]?.match(ifStatement)) {
+                const statement = linesOfCodeArray[currentLine].trim();
+                const commandsToExecuteIfTrue: string[] = [];
+
+                skipLine();
+
+                while (linesOfCodeArray[currentLine].trim() !== keywords.END_IF) {
+                    commandsToExecuteIfTrue.push(linesOfCodeArray[currentLine].trim());
+                    skipLine();
+                }
+
+                let condition = statement
+                    .replace("IF", "")
+                    .replace(operators.STATEMENT_BLOCK_BEGIN, "").split(' ');
+
+                for (let i = 0; i < condition.length; i++) {
+                    if (isNaN(condition[i]) && !condition[i].match(/.*[><\=\!]/)) {
+                        const typeOfData = checkType(condition[i]);
+
+                        if (typeOfData == types.BOOL) {
+                            condition[i] = parseBoolean(condition[i])
+                            continue;
+                        }
+
+                        condition[i] = checkType(condition[i]) === "arrRetrieveEl" ? handleRetrieveElementFromArray(condition[i].trim()) : searchInVariablesAndConstants(condition[i].trim())
+                    }
+                }
+
+                const evaluateCondition = eval(condition.join(''));
+
+                if (evaluateCondition) {
+                    for (let i = 0; i < commandsToExecuteIfTrue.length; i++) {
+                        parseLine(commandsToExecuteIfTrue[i]);
+                    }
+                }
+
+                currentLine++;
+                continue;
+            }
+
+            if (linesOfCodeArray[currentLine]?.match(forStatement)) {
+                const statement = linesOfCodeArray[currentLine].trim();
+                const commandsToBeRepeated: string[] = [];
+
+                const parsed = statement
+                    .replace(keywords.FOR, "")
+                    .replace(operators.STATEMENT_BLOCK_BEGIN, "")
+
+
+                skipLine();
+
+                while (linesOfCodeArray[currentLine].trim() != keywords.END_FOR) {
+                    commandsToBeRepeated.push(linesOfCodeArray[currentLine]);
+                    skipLine();
+                }
+
+                let conditionIsStillTrue: boolean = true;
+
+                while (conditionIsStillTrue) {
+                    let expression = parsed.trim().split(' ')
+
+                    for (let i = 0; i < expression.length; i++) {
+                        if (isNaN(expression[i]) && !expression[i].match(/.*[><\=\!]/)) {
+                            const typeOfData = checkType(expression[i]);
+
+                            if (typeOfData == types.BOOL) {
+                                expression[i] = parseBoolean(expression[i])
+                                continue;
+                            }
+
+                            expression[i] = searchInVariablesAndConstants(expression[i])
+                        }
+                    }
+
+                    if (eval(expression.join(''))) {
+                        for (let i = 0; i < commandsToBeRepeated.length; i++) {
+                            parseLine(commandsToBeRepeated[i])
+                        }
+                        continue;
+                    }
+
+                    conditionIsStillTrue = false;
+                }
+
+                currentLine++;
+                continue;
+            }
 
             if (linesOfCodeArray[currentLine].includes(keywords.EXIT))
                 throw "the program has exited";
@@ -481,7 +576,7 @@ function printToConsole(data, isArray?: boolean) {
     }
 
     if (isNaN(data)) {
-        if(data.match(arrayRetrieveElement)){
+        if (data.match(arrayRetrieveElement)) {
             console.log('aaa')
             return;
         }
@@ -1030,7 +1125,7 @@ function handleMathFunction(mathFunction: string) {
         }
 
     math.arg1 = Number(math.arg1);
-    if(math.arg2 !== undefined) math.arg2 = Number(math.arg2);
+    if (math.arg2 !== undefined) math.arg2 = Number(math.arg2);
 
     switch (math.operation) {
         case MathFunctions.ABS:
